@@ -1,37 +1,69 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, BufReader};
-use trees::{fr, tr};
 
 // struct Bag {
 //     color: String,
 //     quantity: i32,
 // }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Bag {
     name: String,
-    parent: Option<Box<Bag>>,
-    children: Vec<Bag>,
+    children: Vec<String>,
 }
 
-fn count_bags(bag: Option<Box<Bag>>) -> i32 {
-    0
+fn count_bags(bags: Vec<Bag>, name: &String) -> i32 {
+    let mut acc = 0;
+    for bag in bags {
+        for child in &bag.children {
+            if child.contains(name) {
+                acc += 1;
+                break;
+            }
+        }
+    }
+    acc
+}
+
+fn get_parents(bags: Vec<Bag>, name: &String) -> Vec<Bag> {
+    let mut parents = Vec::new();
+    for bag in bags {
+        for child in &bag.children {
+            if child.contains(name) {
+                parents.push(bag.clone());
+                break;
+            }
+        }
+    }
+    parents
+}
+
+fn f(bags: Vec<Bag>, bag: Bag) -> i32 {
+    // if reached end of node return 1
+    let parents = get_parents(bags.clone(), &bag.name);
+    if parents.is_empty() {
+        return 1;
+    }
+
+    let mut sum = 1;
+    for parent in parents {
+        sum += f(bags.clone(), parent);
+    }
+
+    return sum;
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut sgold = Bag {
-        name: "shiny gold".to_string(),
-        parent: None,
-        children: Vec::new(),
-    };
-
-    let mut lines = read_file("input")?;
+    let lines = read_file("test")?;
+    let mut bags: Vec<Bag> = Vec::new();
 
     // while !converged {
     //     if lines.len() == 0 {
     //         converged = true;
     //     }
+
+    //let mut acc = 0;
 
     for line in lines {
         // Clean up that data by removing uninformative info
@@ -52,22 +84,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
 
-        for s in temp[1].clone() {
-            // let temp2: Vec<&str> = s.split(" ").collect();
-            // let mut name: String = temp2[1].to_string();
-            // name.push_str(" ");
-            // name.push_str(temp2[2]);
-            if s.contains("shiny gold") {
-                let child = Bag {
-                    name: temp[0][0].clone(),
-                    parent: Some(Box::new(sgold)),
-                    children: Vec::new(),
-                };
-                println!("{}", temp[0][0]);
-                break;
-            }
-        }
+        let bag = Bag {
+            name: temp[0][0].clone(),
+            children: temp[1].clone(),
+        };
+        bags.push(bag);
     }
+    let bag0: Bag = Bag {
+        name: "shiny gold".to_string(),
+        children: Vec::new(),
+    };
+
+    let count = f(bags, bag0);
+
+    println!("{}", count - 1);
     Ok(())
 }
 
