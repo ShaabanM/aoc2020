@@ -1,69 +1,11 @@
-use std::fs::File;
-use std::io::prelude::*;
 use std::io::{self, BufReader};
-
-// struct Bag {
-//     color: String,
-//     quantity: i32,
-// }
-
-#[derive(Debug, Clone)]
-struct Bag {
-    name: String,
-    children: Vec<String>,
-}
-
-fn count_bags(bags: Vec<Bag>, name: &String) -> i32 {
-    let mut acc = 0;
-    for bag in bags {
-        for child in &bag.children {
-            if child.contains(name) {
-                acc += 1;
-                break;
-            }
-        }
-    }
-    acc
-}
-
-fn get_parents(bags: Vec<Bag>, name: &String) -> Vec<Bag> {
-    let mut parents = Vec::new();
-    for bag in bags {
-        for child in &bag.children {
-            if child.contains(name) {
-                parents.push(bag.clone());
-                break;
-            }
-        }
-    }
-    parents
-}
-
-fn f(bags: Vec<Bag>, bag: Bag) -> i32 {
-    // if reached end of node return 1
-    let parents = get_parents(bags.clone(), &bag.name);
-    if parents.is_empty() {
-        return 1;
-    }
-
-    let mut sum = 1;
-    for parent in parents {
-        sum += f(bags.clone(), parent);
-    }
-
-    return sum;
-}
+use std::{collections::HashMap, fs::File};
+use std::{collections::HashSet, io::prelude::*};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let lines = read_file("test")?;
-    let mut bags: Vec<Bag> = Vec::new();
-
-    // while !converged {
-    //     if lines.len() == 0 {
-    //         converged = true;
-    //     }
-
-    //let mut acc = 0;
+    let lines = read_file("input")?;
+    let mut inverse_bag_tree: HashMap<String, Vec<String>> = HashMap::new();
+    let mut bag_tree: HashMap<String, Vec<String>> = HashMap::new();
 
     for line in lines {
         // Clean up that data by removing uninformative info
@@ -84,21 +26,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
 
-        let bag = Bag {
-            name: temp[0][0].clone(),
-            children: temp[1].clone(),
-        };
-        bags.push(bag);
+        bag_tree.insert(temp[0][0].clone(), temp[1].clone());
+
+        // inverse bag tree will be hashmap of child: vec<parents>
+        for bag in temp[1].iter() {
+            if bag != "no other" {
+                let bag = bag[1..].trim().to_string();
+                match inverse_bag_tree.get_mut(&bag) {
+                    Some(parents) => parents.push(temp[0][0].clone()),
+                    None => {
+                        let mut parents = Vec::new();
+                        parents.push(temp[0][0].clone());
+                        match inverse_bag_tree.insert(bag, parents) {
+                            Some(_) => {}
+                            None => {}
+                        }
+                    }
+                }
+            }
+        }
     }
-    let bag0: Bag = Bag {
-        name: "shiny gold".to_string(),
-        children: Vec::new(),
-    };
+    let containers = get_containers(&"shiny gold".to_string(), &inverse_bag_tree, HashSet::new());
 
-    let count = f(bags, bag0);
+    println!("part1 = {:?}", containers.len());
+    println!(
+        "part2 = {:?}",
+        get_contained(&"shiny gold".to_string(), &bag_tree) - 1
+    );
 
-    println!("{}", count - 1);
     Ok(())
+}
+
+fn get_containers(
+    start: &String,
+    graph: &HashMap<String, Vec<String>>,
+    mut nodes: HashSet<String>,
+) -> HashSet<String> {
+    // handle no parents
+    match graph.get(start) {
+        Some(parents) => {
+            let mut acc = HashSet::new();
+            for parent in parents {
+                nodes.insert(parent.clone());
+                acc.extend(get_containers(parent, graph, nodes.clone()));
+            }
+            return acc;
+        }
+        None => {
+            return nodes;
+        }
+    }
+}
+
+fn get_contained(start: &String, graph: &HashMap<String, Vec<String>>) -> u32 {
+    let children = graph.get(start).unwrap();
+    if children[0].contains("other") {
+        return 1;
+    }
+
+    let mut acc = 1;
+    for child in children {
+        let num = child.chars().next().unwrap();
+        let num = num.to_digit(10).unwrap();
+        let child = child[1..].trim().to_string();
+        acc += num * get_contained(&child, &graph);
+    }
+    acc
 }
 
 // Box error is used as a parent to handle the fact that there are
